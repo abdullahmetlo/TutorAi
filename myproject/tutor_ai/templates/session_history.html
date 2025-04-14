@@ -1,0 +1,150 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Session History</title>
+    {% load static %}
+    <link rel="stylesheet" type="text/css" href="{% static 'css/styles.css' %}">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons/font/bootstrap-icons.css">
+</head>
+<body class="container mt-4">
+
+    <h2 class="text-center mb-4">Session History</h2>
+
+    <!-- API Response Container -->
+    <div id="apiResponse" class="alert alert-info text-center">Waiting for API response...</div>
+
+    <!-- Search and Filter Options -->
+    <div class="row mb-4">
+        <div class="col-md-4">
+            <div class="input-group">
+                <span class="input-group-text"><i class="bi bi-search"></i></span>
+                <input type="text" id="searchInput" class="form-control" placeholder=" Search...">
+            </div>
+        </div>
+        <div class="col-md-4">
+            <select id="taskDifficultyFilter" class="form-control">
+                <option value="">Filter by Task Difficulty</option>
+                <option value="Low">Low</option>
+                <option value="Medium">Medium</option>
+                <option value="High">High</option>
+            </select>
+        </div>
+        <div class="col-md-4">
+            <select id="decisionFilter" class="form-control">
+                <option value="">Filter by RL Decision</option>
+                <option value="Provide Hint">Provide Hint</option>
+                <option value="Show Example">Show Example</option>
+                <option value="Give Explanation">Give Explanation</option>
+                <option value="Introduce Break">Introduce Break</option>
+            </select>
+        </div>
+    </div>
+
+    <!-- Session History Table -->
+    <table class="table table-bordered table-striped" id="sessionTable">
+        <thead class="table-dark">
+            <tr>
+                <th>Session ID</th>
+                <th>User ID</th>
+                <th>Task Difficulty</th>
+                <th>Error Rate</th>
+                <th>Response Time</th>
+                <th>RL Decision</th>
+                <th>Timestamp</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for session in page_obj.object_list %}
+            <tr>
+                <td>{{ session.session_id }}</td>
+                <td>{{ session.user_id }}</td>
+                <td>{{ session.task_difficulty }}</td>
+                <td>{{ session.error_rate }}</td>
+                <td>{{ session.response_time }}</td>
+                <td>{{ session.rl_decision }}</td>
+                <td>{{ session.timestamp }}</td>
+            </tr>
+            {% empty %}
+            <tr>
+                <td colspan="7" class="text-center">No sessions found.</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+
+    <!-- Pagination Controls -->
+    {% if page_obj.paginator.num_pages > 1 %}
+    <nav aria-label="Session history pagination">
+        <ul class="pagination justify-content-center">
+            {% if page_obj.has_previous %}
+                <li class="page-item">
+                    <a class="page-link" href="?page=1">« First</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">‹ Prev</a>
+                </li>
+            {% endif %}
+
+            <li class="page-item active">
+                <span class="page-link">Page {{ page_obj.number }} of {{ page_obj.paginator.num_pages }}</span>
+            </li>
+
+            {% if page_obj.has_next %}
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next ›</a>
+                </li>
+                <li class="page-item">
+                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last »</a>
+                </li>
+            {% endif %}
+        </ul>
+    </nav>
+    {% endif %}
+
+    <!-- JavaScript for Fetching RL Decision -->
+    <script>
+        document.addEventListener("DOMContentLoaded", function() {
+            const searchInput = document.getElementById("searchInput");
+            const taskDifficultyFilter = document.getElementById("taskDifficultyFilter");
+            const decisionFilter = document.getElementById("decisionFilter");
+            const table = document.getElementById("sessionTable").getElementsByTagName("tbody")[0];
+            const rows = table.getElementsByTagName("tr");
+        
+            function filterTable() {
+                const searchText = searchInput.value.toLowerCase();
+                const taskDifficulty = taskDifficultyFilter.value.toLowerCase();
+                const decision = decisionFilter.value.toLowerCase();
+        
+                for (let row of rows) {
+                    let sessionId = row.cells[0].textContent.toLowerCase();
+                    let userId = row.cells[1].textContent.toLowerCase();
+                    let difficulty = row.cells[2].textContent.toLowerCase();
+                    let errorRate = row.cells[3].textContent.toLowerCase();
+                    let responseTime = row.cells[4].textContent.toLowerCase();
+                    let rlDecision = row.cells[5].textContent.toLowerCase();
+        
+                    let matchesSearch = sessionId.includes(searchText) || userId.includes(searchText);
+                    let matchesDifficulty = taskDifficulty === "" || difficulty === taskDifficulty;
+                    let matchesDecision = decision === "" || rlDecision === decision;
+        
+                    if (matchesSearch && matchesDifficulty && matchesDecision) {
+                        row.style.display = "";
+                    } else {
+                        row.style.display = "none";
+                    }
+                }
+            }
+        
+            searchInput.addEventListener("input", filterTable);
+            taskDifficultyFilter.addEventListener("change", filterTable);
+            decisionFilter.addEventListener("change", filterTable);
+        });
+        </script>
+        
+        
+
+</body>
+</html>
