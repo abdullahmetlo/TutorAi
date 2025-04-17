@@ -10,7 +10,15 @@
     <div id="app-container">
         <h1>Math Tutor</h1>
 
-        <!-- Summary of Diagnostic Phase -->
+        <!-- Progress Summary -->
+        <div id="progress-summary" style="margin-bottom: 15px;">
+            <p>Score: <span id="score">0</span> | Incorrect: <span id="incorrect">0</span> | Progress: <span id="progress-text">0%</span></p>
+            <div style="background: #eee; height: 20px; border-radius: 10px; overflow: hidden;">
+                <div id="progress-bar" style="background: #3498db; height: 100%; width: 0%; transition: width 0.3s;"></div>
+            </div>
+        </div>
+
+        <!-- Diagnostic Summary -->
         <div id="summary-container" style="margin-bottom: 20px;">
             <h3>Personalized Summary</h3>
             <p><strong>Cognitive Load:</strong> <span id="cog-load"></span></p>
@@ -28,35 +36,52 @@
     </div>
 
     <script>
-        // Load diagnostic data from localStorage
+        let currentQuestion;
+        let score = 0;
+        let incorrect = 0;
+        let totalQuestions = 0;
+        let startTime;
+
         function loadDiagnosticSummary() {
             const load = localStorage.getItem("diagnostic_cognitive_load") || "unknown";
             const hint = localStorage.getItem("used_hint") === "true";
             const breakTaken = localStorage.getItem("took_break") === "true";
 
             document.getElementById("cog-load").innerText = load;
-            document.getElementById("hint-usage").innerText = hint ? "Yes (Great job using support!)" : "No (Very confident!)";
-            document.getElementById("break-status").innerText = breakTaken ? "Yes (Good self-care!)" : "No (Remember to rest!)";
+            document.getElementById("hint-usage").innerText = hint ? "Yes" : "No";
+            document.getElementById("break-status").innerText = breakTaken ? "Yes" : "No";
 
             localStorage.removeItem("diagnostic_cognitive_load");
             localStorage.removeItem("used_hint");
             localStorage.removeItem("took_break");
         }
 
-        // Sample tutoring question (this could later be fetched from backend)
-        const sampleQuestion = {
-            question: "What is 1/2 + 1/4?",
-            options: ["1/8", "3/4", "2/4", "1"],
-            correctIndex: 1
-        };
+        function updateProgress() {
+            const total = score + incorrect;
+            const percent = total > 0 ? Math.floor((score / total) * 100) : 0;
+            document.getElementById("progress-text").innerText = `${percent}%`;
+            document.getElementById("progress-bar").style.width = `${percent}%`;
+        }
 
-        window.onload = () => {
-            loadDiagnosticSummary();
+        function loadQuestionFromAPI() {
+            startTime = new Date();
+            fetch("/api/get_tutoring_question/")
+                .then(res => res.json())
+                .then(data => {
+                    currentQuestion = data;
+                    renderQuestion(data);
+                })
+                .catch(err => {
+                    console.error("Failed to load question:", err);
+                    document.getElementById("question-text").innerText = "Failed to load question.";
+                });
+        }
 
-            document.getElementById("question-text").innerText = sampleQuestion.question;
+        function renderQuestion(q) {
+            document.getElementById("question-text").innerText = q.question;
             const container = document.getElementById("options");
-
-            sampleQuestion.options.forEach((opt, idx) => {
+            container.innerHTML = "";
+            q.options.forEach((opt, idx) => {
                 container.innerHTML += `
                     <label class="option-label">
                         <input type="radio" name="option" value="${idx}" class="option-radio">
@@ -64,21 +89,58 @@
                     </label>
                 `;
             });
-        };
+            document.getElementById("feedback").innerText = "";
+        }
 
         function submitAnswer() {
             const selected = document.querySelector('input[name="option"]:checked');
             const feedbackElement = document.getElementById("feedback");
+            if (!selected) return alert("Please select an option!");
 
-            if (!selected) {
-                alert("Please select an option!");
-                return;
+            const responseTime = (new Date() - startTime) / 1000;
+            const selectedIndex = parseInt(selected.value);
+            const isCorrect = selectedIndex === currentQuestion.correctIndex;
+
+            if (isCorrect) {
+                score++;
+            } else {
+                incorrect++;
             }
 
-            const isCorrect = parseInt(selected.value) === sampleQuestion.correctIndex;
+            document.getElementById("score").innerText = score;
+            document.getElementById("incorrect").innerText = incorrect;
+            updateProgress();
+
+            fetch("/api/log_tutoring_response/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    question_id: currentQuestion.id,
+                    selected_index: selectedIndex,
+                    is_correct: isCorrect,
+                    response_time: responseTime,
+                    cognitive_load: document.getElementById("cog-load").innerText,
+                    used_hint: document.getElementById("hint-usage").innerText.includes("Yes"),
+                    took_break: document.getElementById("break-status").innerText.includes("Yes")
+                })
+            });
+
             feedbackElement.innerText = isCorrect ? "✅ Correct!" : "❌ Try again.";
             feedbackElement.className = isCorrect ? "correct" : "";
+
+            if (isCorrect) {
+                setTimeout(() => {
+                    feedbackElement.innerText = "";
+                    feedbackElement.className = "";
+                    loadQuestionFromAPI();
+                }, 1500);
+            }
         }
+
+        window.onload = () => {
+            loadDiagnosticSummary();
+            loadQuestionFromAPI();
+        };
     </script>
 </body>
 </html>

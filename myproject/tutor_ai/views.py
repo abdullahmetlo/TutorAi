@@ -10,6 +10,8 @@ from django.core.paginator import Paginator
 from django.shortcuts import render
 from django.contrib.auth.models import User
 from django.views.decorators.http import require_http_methods
+from django.views.decorators.http import require_GET
+from django.http import JsonResponse
 
 from .models import TutoringSession
 from .utils import (
@@ -218,3 +220,49 @@ def session_history(request):
 
 def tutor_ui(request):
     return render(request, "tutor_ui.html")
+
+@require_GET
+def get_tutoring_question(request):
+    # Placeholder logic – later we can use RL or cognitive load to personalize this
+    question = {
+        "question": "What is 3/4 + 1/8?",
+        "options": ["7/8", "1/2", "1", "5/8"],
+        "correctIndex": 0,
+        "hint": "Find a common denominator."
+    }
+    return JsonResponse(question)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def log_tutoring_response(request):
+    try:
+        data = json.loads(request.body)
+
+        session_id = data.get("session_id", str(uuid.uuid4()))
+        user_id = data.get("user_id", "guest")
+        question_id = data.get("question_id", "N/A")
+        selected_index = data.get("selected_index")
+        is_correct = data.get("is_correct", False)
+        response_time = float(data.get("response_time", 0.0))
+        cognitive_load = data.get("cognitive_load", "unknown")
+        used_hint = data.get("used_hint", False)
+        took_break = data.get("took_break", False)
+
+        TutoringSession.objects.create(
+            session_id=session_id,
+            user_id=user_id,
+            task_difficulty="unknown",
+            error_rate=0 if is_correct else 1,
+            response_time=response_time,
+            rl_decision="auto",
+            used_hint=used_hint,
+            took_break=took_break,
+            cognitive_load=cognitive_load,
+        )
+
+        return JsonResponse({"message": "Response logged"}, status=200)
+
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+
