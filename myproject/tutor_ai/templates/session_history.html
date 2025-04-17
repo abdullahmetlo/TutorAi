@@ -13,10 +13,8 @@
 
     <h2 class="text-center mb-4">Session History</h2>
 
-    <!-- API Response Container -->
     <div id="apiResponse" class="alert alert-info text-center">Waiting for API response...</div>
 
-    <!-- Search and Filter Options -->
     <div class="row mb-4">
         <div class="col-md-4">
             <div class="input-group">
@@ -43,7 +41,6 @@
         </div>
     </div>
 
-    <!-- Session History Table -->
     <table class="table table-bordered table-striped" id="sessionTable">
         <thead class="table-dark">
             <tr>
@@ -53,6 +50,8 @@
                 <th>Error Rate</th>
                 <th>Response Time</th>
                 <th>RL Decision</th>
+                <th>Used Hint</th>
+                <th>Took Break</th>
                 <th>Timestamp</th>
             </tr>
         </thead>
@@ -65,27 +64,24 @@
                 <td>{{ session.error_rate }}</td>
                 <td>{{ session.response_time }}</td>
                 <td>{{ session.rl_decision }}</td>
+                <td>{{ session.used_hint|yesno:"Yes,No" }}</td>
+                <td>{{ session.took_break|yesno:"Yes,No" }}</td>
                 <td>{{ session.timestamp }}</td>
             </tr>
             {% empty %}
             <tr>
-                <td colspan="7" class="text-center">No sessions found.</td>
+                <td colspan="9" class="text-center">No sessions found.</td>
             </tr>
             {% endfor %}
         </tbody>
     </table>
 
-    <!-- Pagination Controls -->
     {% if page_obj.paginator.num_pages > 1 %}
     <nav aria-label="Session history pagination">
         <ul class="pagination justify-content-center">
             {% if page_obj.has_previous %}
-                <li class="page-item">
-                    <a class="page-link" href="?page=1">« First</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.previous_page_number }}">‹ Prev</a>
-                </li>
+                <li class="page-item"><a class="page-link" href="?page=1">« First</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.previous_page_number }}">‹ Prev</a></li>
             {% endif %}
 
             <li class="page-item active">
@@ -93,18 +89,13 @@
             </li>
 
             {% if page_obj.has_next %}
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.next_page_number }}">Next ›</a>
-                </li>
-                <li class="page-item">
-                    <a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last »</a>
-                </li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.next_page_number }}">Next ›</a></li>
+                <li class="page-item"><a class="page-link" href="?page={{ page_obj.paginator.num_pages }}">Last »</a></li>
             {% endif %}
         </ul>
     </nav>
     {% endif %}
 
-    <!-- JavaScript for Fetching RL Decision -->
     <script>
         document.addEventListener("DOMContentLoaded", function() {
             const searchInput = document.getElementById("searchInput");
@@ -112,12 +103,12 @@
             const decisionFilter = document.getElementById("decisionFilter");
             const table = document.getElementById("sessionTable").getElementsByTagName("tbody")[0];
             const rows = table.getElementsByTagName("tr");
-        
+
             function filterTable() {
                 const searchText = searchInput.value.toLowerCase();
                 const taskDifficulty = taskDifficultyFilter.value.toLowerCase();
                 const decision = decisionFilter.value.toLowerCase();
-        
+
                 for (let row of rows) {
                     let sessionId = row.cells[0].textContent.toLowerCase();
                     let userId = row.cells[1].textContent.toLowerCase();
@@ -125,11 +116,11 @@
                     let errorRate = row.cells[3].textContent.toLowerCase();
                     let responseTime = row.cells[4].textContent.toLowerCase();
                     let rlDecision = row.cells[5].textContent.toLowerCase();
-        
+
                     let matchesSearch = sessionId.includes(searchText) || userId.includes(searchText);
                     let matchesDifficulty = taskDifficulty === "" || difficulty === taskDifficulty;
                     let matchesDecision = decision === "" || rlDecision === decision;
-        
+
                     if (matchesSearch && matchesDifficulty && matchesDecision) {
                         row.style.display = "";
                     } else {
@@ -137,14 +128,11 @@
                     }
                 }
             }
-        
+
             searchInput.addEventListener("input", filterTable);
             taskDifficultyFilter.addEventListener("change", filterTable);
             decisionFilter.addEventListener("change", filterTable);
         });
-        </script>
-        
-        
-
+    </script>
 </body>
 </html>

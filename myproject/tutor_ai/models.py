@@ -13,6 +13,10 @@ class TutoringSession(models.Model):
     rl_decision = models.CharField(max_length=50)
     model_confidence = models.FloatField(default=1.0)
     timestamp = models.DateTimeField(auto_now_add=True)
+    used_hint= models.BooleanField(default=False)
+    took_break = models.BooleanField(default=False)
+    timestamp = models.DateTimeField(auto_now_add=True)
+
 
     def __str__(self):
         return f"Session {self.session_id} | User: {self.user_id} | Decision: {self.rl_decision} | {self.timestamp}"

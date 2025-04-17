@@ -1,0 +1,197 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Diagnostic Phase</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div id="app-container">
+        <h1>Diagnostic Test</h1>
+        <div id="question-container">
+            <p id="question-text">Loading...</p>
+            <div id="options"></div>
+            <div class="button-group">
+                <button onclick="submitAnswer()">Submit</button>
+                <button onclick="showHint()">Request Hint</button>
+                <button onclick="takeBreak()">Take a Break</button>
+            </div>
+        </div>
+        <p id="feedback"></p>
+        <canvas id="performanceChart" width="400" height="200" style="display:none;"></canvas>
+    </div>
+    {{ questions|json_script:"diagnostic-data" }}
+
+    <script>
+        const questions = JSON.parse(document.getElementById("diagnostic-data").textContent);
+
+        let currentIndex = 0;
+        let userAnswers = [];
+        let totalTime = 0;
+        let startTime;
+        let sessionUsedHint = false;
+        let sessionTookBreak = false;
+        let currentHintUsed = false;
+        let currentBreakTaken = false;
+        let correctAnswers = 0;
+
+        loadQuestion();
+
+        function loadQuestion() {
+            if (currentIndex >= questions.length) {
+                submitResults();
+                return;
+            }
+
+            const q = questions[currentIndex];
+            startTime = new Date();
+            currentHintUsed = false;
+            currentBreakTaken = false;
+
+            document.getElementById("question-text").innerText = q.question;
+            const container = document.getElementById("options");
+            container.innerHTML = "";
+
+            q.options.forEach((opt, idx) => {
+                container.innerHTML += `
+                    <label class="option-label">
+                        <input type="radio" name="option" value="${idx}" class="option-radio">
+                        <span class="option-box">${opt}</span>
+                    </label>
+                `;
+            });
+
+            document.getElementById("feedback").innerText = "";
+        }
+
+        function submitAnswer() {
+            const selected = document.querySelector('input[name="option"]:checked');
+            if (!selected) return alert("Please select an option");
+
+            const answerTime = (new Date() - startTime) / 1000;
+            totalTime += answerTime;
+
+            const q = questions[currentIndex];
+            const selectedIndex = parseInt(selected.value);
+            const isCorrect = selectedIndex === q.correctIndex;
+
+            if (isCorrect) correctAnswers++;
+
+            userAnswers.push({
+                question_id: currentIndex + 1,
+                correct: isCorrect,
+                response_time: answerTime,
+                hint_used: currentHintUsed,
+                break_taken: currentBreakTaken
+            });
+
+            if (currentHintUsed) sessionUsedHint = true;
+            if (currentBreakTaken) sessionTookBreak = true;
+
+            currentIndex++;
+            loadQuestion();
+        }
+
+        function showHint() {
+            const q = questions[currentIndex];
+            document.getElementById("feedback").innerText = "Hint: " + (q.hint || "No hint available.");
+            currentHintUsed = true;
+        }
+
+        function takeBreak() {
+            currentBreakTaken = true;
+            alert("Taking a short break... come back when you're ready!");
+        }
+
+        function generateFeedback(cognitiveLoad) {
+            let message = `<h2>Your cognitive load is estimated to be: 
+                <span style='color: #3498db;'>${cognitiveLoad}</span></h2>`;
+
+            const totalQuestions = questions.length;
+            const score = `${correctAnswers}/${totalQuestions}`;
+            const avgTime = (totalTime / totalQuestions).toFixed(2);
+
+            message += `<p>You answered <strong>${score}</strong> questions correctly.</p>`;
+            message += `<p>Average response time: <strong>${avgTime} seconds</strong>.</p>`;
+
+            if (sessionUsedHint) {
+                message += `<p>You requested hints. Great! Don’t hesitate to use help when needed.</p>`;
+            } else {
+                message += `<p>You didn’t use any hints. Impressive confidence!</p>`;
+            }
+
+            if (sessionTookBreak) {
+                message += `<p>You took a break. Good self-awareness!</p>`;
+            } else {
+                message += `<p>No breaks taken. Make sure to rest if needed!</p>`;
+            }
+
+            return message;
+        }
+
+        function drawChart() {
+            const ctx = document.getElementById('performanceChart');
+            ctx.style.display = 'block';
+
+            const labels = userAnswers.map((ans, i) => `Q${i+1}`);
+            const data = userAnswers.map(ans => ans.correct ? 1 : 0);
+
+            new Chart(ctx, {
+                type: 'bar',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Correct (1) / Incorrect (0)',
+                        data: data,
+                        backgroundColor: '#3498db',
+                        borderWidth: 1
+                    }]
+                },
+                options: {
+                    scales: {
+                        y: {
+                            beginAtZero: true,
+                            max: 1
+                        }
+                    }
+                }
+            });
+        }
+
+        function submitResults() {
+            fetch("/api/submit_diagnostic/", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    answers: userAnswers,
+                    response_time: totalTime,
+                    used_hint: sessionUsedHint,
+                    took_break: sessionTookBreak
+                })
+            })
+            .then(res => res.json())
+            .then(data => {
+                console.log("Diagnostic Response:", data); 
+                const summary = generateFeedback(data.cognitive_load);
+                document.getElementById("question-container").innerHTML = summary;
+                drawChart();
+
+                localStorage.setItem("diagnostic_cognitive_load", data.cognitive_load);
+                localStorage.setItem("used_hint", sessionUsedHint);
+                localStorage.setItem("took_break", sessionTookBreak);
+
+                setTimeout(() => {
+                    window.location.href = "/tutor/";
+                }, 6000);
+            })
+            .catch(err => {
+                document.getElementById("question-container").innerHTML =
+                    `<h2 style='color:red;'>Failed to submit results. Please try again later.</h2>`;
+                console.error("Submission error:", err);
+            });
+        }
+    </script>
+</body>
+</html>

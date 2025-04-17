@@ -1,21 +1,85 @@
 import json
+import uuid
+import numpy as np
+import logging
+import time
+
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.core.paginator import Paginator
 from django.shortcuts import render
+from django.contrib.auth.models import User
+from django.views.decorators.http import require_http_methods
+
+from .models import TutoringSession
+from .utils import (
+    update_user_profile,
+    get_oer_content,
+    simplify_text_with_ai,
+    estimate_initial_load,
+    load_diagnostic_questions
+)
 from .rl_model import (
     load_q_table,
     get_rl_recommendation,
-    ml_estimate_cognitive_load,  # ✅ NEW ML-based function
+    ml_estimate_cognitive_load,
     update_transition_counts
 )
-from .models import TutoringSession
-from .utils import update_user_profile
-from django.contrib.auth.models import User
-import uuid
-import numpy as np
+
+# Logging setup
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 q_table = load_q_table()
+
+@csrf_exempt
+def diagnostic_view(request):
+    questions = load_diagnostic_questions()
+    return render(request, "diagnostic.html", {"questions": questions})
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def submit_diagnostic(request):
+    try:
+        data = json.loads(request.body)
+        answers = data.get("answers", [])
+        response_time = data.get("response_time", 30.0)
+        used_hint = data.get("used_hint", False)
+        took_break = data.get("took_break", False)
+
+        logger.info(f"Diagnostic POST data: {data}")
+        logger.info(f"Diagnostic submitted. Hint used: {used_hint}, Took break: {took_break}")
+
+        if not answers:
+            return JsonResponse({"error": "No answers provided."}, status=400)
+
+        cognitive_load = estimate_initial_load(answers, response_time, used_hint, took_break)
+
+        return JsonResponse({
+            "cognitive_load": cognitive_load
+        }, status=200)
+    except Exception as e:
+        return JsonResponse({"error": str(e)}, status=500)
+
+@csrf_exempt
+def diagnostic_submit(request):
+    if request.method == "POST":
+        data = json.loads(request.body)
+        answers = data.get("answers", [])
+        response_time = data.get("response_time", 30.0)
+        used_hint = data.get("used_hint", False)
+        took_break = data.get("took_break", False)
+
+        if not answers:
+            return JsonResponse({"error": "No answers submitted."}, status=400)
+
+        load = estimate_initial_load(answers, response_time, used_hint, took_break)
+
+        return JsonResponse({
+            "message": "Initial cognitive load estimated successfully.",
+            "initial_load": load
+        })
+    return JsonResponse({"error": "Only POST requests allowed."}, status=405)
 
 @csrf_exempt
 def tutoring_decision(request):
@@ -29,15 +93,17 @@ def tutoring_decision(request):
 
             user_id = data.get("user_id", "guest")
             session_id = uuid.uuid4()
+            used_hint = data.get("hint_used", False)
+            took_break = data.get("took_break", False)
+            cognitive_load = data.get("cognitive_load", "unknown")  # ✅ Step 4
 
-            # ✅ Determine average values (for ML input)
+            # ML-based cognitive load estimation with fallback values
             avg_error = 0.5
             avg_time = 30.0
             if request.user.is_authenticated and hasattr(request.user, "userprofile"):
                 avg_error = request.user.userprofile.average_error_rate
                 avg_time = request.user.userprofile.average_response_time
 
-            # ✅ Use ML-based cognitive load estimation
             load_state = ml_estimate_cognitive_load(
                 task_difficulty=data["task_difficulty"],
                 error_rate=data["error_rate"],
@@ -47,41 +113,64 @@ def tutoring_decision(request):
             )
             state_index = load_state.value
 
-            # Get recommendation
+            state_features = {
+                "task_difficulty": data["task_difficulty"],
+                "error_rate": data["error_rate"],
+                "response_time": data["response_time"],
+                "used_hint": used_hint,
+                "took_break": took_break,
+            }
+
+            # RL decision making
             recommendation = get_rl_recommendation(data, q_table)
 
-            # Save session
+            # Fetch OER content
+            oer_content = get_oer_content(recommendation["decision"])
+            raw_text = (
+                oer_content.get("explanation")
+                or oer_content.get("hint")
+                or oer_content.get("example")
+                or oer_content.get("note", "No content found.")
+            )
+
+            try:
+                simplified = simplify_text_with_ai(raw_text)
+            except Exception as e:
+                logger.error(f"Hugging Face API error: {e}")
+                simplified = f"(AI Error) {raw_text}"
+
+            # ✅ Save session including cognitive_load
             session = TutoringSession.objects.create(
                 session_id=session_id,
                 user_id=user_id,
                 task_difficulty=data["task_difficulty"],
                 error_rate=data["error_rate"],
                 response_time=data["response_time"],
-                rl_decision=recommendation["decision"]
+                rl_decision=recommendation["decision"],
+                used_hint=used_hint,
+                took_break=took_break,
+                cognitive_load=cognitive_load  # ✅ STEP 4 saved here
             )
-            session.save()
 
-            # Try to update user profile using Django user ID
             try:
                 user_obj = User.objects.get(username=user_id)
                 update_user_profile(
                     user=user_obj,
                     response_time=data["response_time"],
                     is_correct=(data["error_rate"] == 0),
-                    hint_used=data.get("hint_used", False),
-                    break_taken=(recommendation["decision"] == "Introduce Break")
+                    hint_used=used_hint,
+                    break_taken=took_break
                 )
             except User.DoesNotExist:
-                pass  # Guest or user not found
+                pass
 
-            # Optional: Update transition model
             update_transition_counts(state_index, state_index, np.argmax(q_table[state_index]))
 
             return JsonResponse({
                 "session_id": str(session.session_id),
                 "user_id": user_id,
                 "decision": recommendation["decision"],
-                "next_content": recommendation["next_content"],
+                "next_content": simplified,
                 "message": "Session saved successfully"
             }, status=200)
 
@@ -102,6 +191,9 @@ def get_user_sessions(request):
                 "error_rate": session.error_rate,
                 "response_time": session.response_time,
                 "rl_decision": session.rl_decision,
+                "used_hint": session.used_hint,
+                "took_break": session.took_break,
+                "cognitive_load": session.cognitive_load,
                 "timestamp": session.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
             }
             for session in sessions
@@ -123,3 +215,6 @@ def session_history(request):
         "user_id": user_id,
         "message": "No session history found." if not page_obj.object_list else "",
     })
+
+def tutor_ui(request):
+    return render(request, "tutor_ui.html")

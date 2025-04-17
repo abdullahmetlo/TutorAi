@@ -1,0 +1,84 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Tutoring Interface</title>
+    <link rel="stylesheet" href="{% static 'css/styles.css' %}">
+</head>
+<body>
+    <div id="app-container">
+        <h1>Math Tutor</h1>
+
+        <!-- Summary of Diagnostic Phase -->
+        <div id="summary-container" style="margin-bottom: 20px;">
+            <h3>Personalized Summary</h3>
+            <p><strong>Cognitive Load:</strong> <span id="cog-load"></span></p>
+            <p><strong>Hint Usage:</strong> <span id="hint-usage"></span></p>
+            <p><strong>Break Taken:</strong> <span id="break-status"></span></p>
+        </div>
+
+        <!-- Tutoring Question -->
+        <div id="question-container">
+            <p id="question-text">Loading...</p>
+            <div id="options"></div>
+            <button onclick="submitAnswer()">Submit</button>
+        </div>
+        <p id="feedback"></p>
+    </div>
+
+    <script>
+        // Load diagnostic data from localStorage
+        function loadDiagnosticSummary() {
+            const load = localStorage.getItem("diagnostic_cognitive_load") || "unknown";
+            const hint = localStorage.getItem("used_hint") === "true";
+            const breakTaken = localStorage.getItem("took_break") === "true";
+
+            document.getElementById("cog-load").innerText = load;
+            document.getElementById("hint-usage").innerText = hint ? "Yes (Great job using support!)" : "No (Very confident!)";
+            document.getElementById("break-status").innerText = breakTaken ? "Yes (Good self-care!)" : "No (Remember to rest!)";
+
+            localStorage.removeItem("diagnostic_cognitive_load");
+            localStorage.removeItem("used_hint");
+            localStorage.removeItem("took_break");
+        }
+
+        // Sample tutoring question (this could later be fetched from backend)
+        const sampleQuestion = {
+            question: "What is 1/2 + 1/4?",
+            options: ["1/8", "3/4", "2/4", "1"],
+            correctIndex: 1
+        };
+
+        window.onload = () => {
+            loadDiagnosticSummary();
+
+            document.getElementById("question-text").innerText = sampleQuestion.question;
+            const container = document.getElementById("options");
+
+            sampleQuestion.options.forEach((opt, idx) => {
+                container.innerHTML += `
+                    <label class="option-label">
+                        <input type="radio" name="option" value="${idx}" class="option-radio">
+                        <span class="option-box">${opt}</span>
+                    </label>
+                `;
+            });
+        };
+
+        function submitAnswer() {
+            const selected = document.querySelector('input[name="option"]:checked');
+            const feedbackElement = document.getElementById("feedback");
+
+            if (!selected) {
+                alert("Please select an option!");
+                return;
+            }
+
+            const isCorrect = parseInt(selected.value) === sampleQuestion.correctIndex;
+            feedbackElement.innerText = isCorrect ? "✅ Correct!" : "❌ Try again.";
+            feedbackElement.className = isCorrect ? "correct" : "";
+        }
+    </script>
+</body>
+</html>

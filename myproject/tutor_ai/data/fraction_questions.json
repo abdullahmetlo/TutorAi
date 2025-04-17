@@ -1,0 +1,102 @@
+[
+    {
+    "topic": "fractions",
+    "strategy": "Provide Hint",
+    "hint": "To add fractions, first check if the denominators are the same."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Show Example",
+    "example": "1/4 + 2/4 = 3/4"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Give Explanation",
+    "explanation": "When adding fractions with the same denominator, just add the numerators and keep the denominator."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Introduce Break",
+    "note": "You've been working hard! Take 1 minute to rest your eyes. 😊"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Provide Hint",
+    "hint": "If denominators are different, find a common denominator before adding."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Show Example",
+    "example": "1/2 + 1/3 → common denominator is 6 → 3/6 + 2/6 = 5/6"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Give Explanation",
+    "explanation": "To add 1/2 and 1/3, convert them to have the same denominator: 3/6 and 2/6. Then add: 3+2 = 5 → 5/6."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Introduce Break",
+    "note": "Time for a mini-break — grab a glass of water!"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Provide Hint",
+    "hint": "To subtract fractions, you need to subtract the numerators only when denominators match."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Show Example",
+    "example": "3/5 - 2/5 = 1/5"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Give Explanation",
+    "explanation": "Same denominator? Just subtract the numerators. Keep the denominator the same."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Provide Hint",
+    "hint": "When multiplying fractions, multiply the top numbers, then the bottom."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Show Example",
+    "example": "1/2 × 1/4 = 1/8"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Give Explanation",
+    "explanation": "To multiply fractions, multiply numerators together, and denominators together."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Provide Hint",
+    "hint": "Dividing by a fraction? Multiply by its reciprocal."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Show Example",
+    "example": "1/2 ÷ 1/4 = 1/2 × 4/1 = 4/2 = 2"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Give Explanation",
+    "explanation": "To divide fractions, flip the second one and multiply."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Introduce Break",
+    "note": "Need a break? Close your eyes for 30 seconds and take deep breaths. 🧘"
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Provide Hint",
+    "hint": "Always simplify your answer if possible."
+    },
+    {
+    "topic": "fractions",
+    "strategy": "Show Example",
+    "example": "2/4 simplifies to 1/2"
+    }
+]
